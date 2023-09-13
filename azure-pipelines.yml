@@ -14,7 +14,7 @@ name: Deploy Static Website
 variables:
   vmImageName: 'windows-latest'
   azureServiceConnection: 'azureServiceConnection'
-  subscriptionId: '2c010df0-52be-47db-b9e3-836f5ca4e408'
+  subscriptionId: '**MASKED**'
   resourceGroupName: 'nhg'
   location: 'eastus'
   templateFile: './infrastructure/nhg_infra.bicep'
@@ -43,9 +43,6 @@ stages:
       inputs:
         archiveFilePatterns: '*/$(Build.BuildId).zip'
         destinationFolder: '$(Build.DefaultWorkingDirectory)/$(Build.BuildId)'
-
-    # Authenticate with Azure using the service principal
-      az login --service-principal -u $servicePrincipalId -p $servicePrincipalKey --tenant $tenantId
 
     #Validate Bicep Template
     - task: AzureResourceManagerTemplateDeployment@3
@@ -77,7 +74,7 @@ stages:
   - job: BlueGreenDeployment
     steps:
     - script: |
-      displayName: 'Build Static Website'
+      displayName: 'Deploy Static Website'
 
     - task: AzureCLI@2
       inputs:
