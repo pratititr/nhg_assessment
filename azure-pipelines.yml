@@ -1,0 +1,98 @@
+trigger:
+- main
+
+name: Deploy Static Website
+
+variables:
+  vmImageName: 'windows-latest'
+  azureServiceConnection: 'azureServiceConnection'
+  subscriptionId: '2c010df0-52be-47db-b9e3-836f5ca4e408'
+  resourceGroupName: 'nhg'
+  location: 'eastus'
+  templateFile: './infrastructure/nhg_infra.bicep'
+  templateFileendpoint: './infrastructure/endpoint.bicep'
+  servicePrincipalId: 'servicePrincipalId'
+  servicePrincipalKey: 'servicePrincipalKey'
+  tenantId: 'tenantId'
+  
+
+pool:
+  vmImage: $(vmImageName)
+
+
+stages:
+- stage: Infra Deploy
+  jobs:
+  - job: Infra Deploy
+    steps:
+    - script: |
+      displayName: 'Infra Deployment'
+
+    steps:
+    #Extract Files from CI Build Artifact
+    - task: ExtractFiles@1
+      displayName: 'Extract files '
+      inputs:
+        archiveFilePatterns: '*/$(Build.BuildId).zip'
+        destinationFolder: '$(Build.DefaultWorkingDirectory)/$(Build.BuildId)'
+
+    # Authenticate with Azure using the service principal
+      az login --service-principal -u $servicePrincipalId -p $servicePrincipalKey --tenant $tenantId
+
+    #Validate Bicep Template
+    - task: AzureResourceManagerTemplateDeployment@3
+      displayName: 'ARM Template deployment: Resource Group scope'
+      inputs:
+        azureResourceManagerConnection: 'Free Trial (2c010df0-52be-47db-b9e3-836f5ca4e408)'
+        subscriptionId: $(subscriptionId)
+        resourceGroupName: $(resourceGroupName)
+       location: $(location)
+        csmFile: $(templateFile)
+        deploymentMode: Validation
+
+    #Deploy Bicep    
+    - task: AzureCLI@2
+      inputs:
+        azureSubscription: 'Free Trial(2c010df0-52be-47db-b9e3-836f5ca4e408)'
+        scriptType: 'ps'
+        scriptLocation: 'inlineScript'
+        inlineScript: |
+          az group create --name nhgDemo --location "East US"
+          az deployment group create --resource-group nhgDemo --template-file ./infrastructure/storage.bicep
+          az storage blob service-properties update --account-name mystorageaccountgreen --static-website --404-document error.html --index-document index.html
+          az storage blob service-properties update --account-name mystorageaccountblue --static-website --404-document error.html --index-document index.html
+          az deployment group create --resource-group nhgDemo --template-file ./infrastructure/frontdoor.bicep
+
+stages:
+- stage: DeploytoProd
+  jobs:
+  - job: BlueGreenDeployment
+    steps:
+    - script: |
+      displayName: 'Build Static Website'
+
+    - task: AzureCLI@2
+      inputs:
+        azureSubscription: 'Free Trial(2)(2c010df0-52be-47db-b9e3-836f5ca4e408)'
+        scriptType: 'ps'
+        scriptLocation: 'inlineScript'
+        inlineScript: |
+          # Set variables
+          resourceGroupName="nhgdemo"
+          frontDoorName="myFrontDoor"
+          backendPoolName="myOriginGroup"
+          originNameToDisable="blueOrigin"
+      
+      
+          storageAccountName="mystorageaccountblue"
+          containerName="$web"
+          localDirectory="./*.html"
+      
+          # Disable the origin
+          az network front-door backend-pool backend update --resource-group $resourceGroupName --front-door-name $frontDoorName --backend-pool-name $backendPoolName --name $originNameToDisable --enabled false
+      
+          # Upload files to Azure Blob Storage
+          az storage blob upload-batch --destination $containerName --source $localDirectory --account-name $storageAccountName
+
+          # Enable the origin
+          az network front-door backend-pool backend update --resource-group $resourceGroupName --front-door-name $frontDoorName --backend-pool-name $backendPoolName --name $originNameToDisable --enabled true
