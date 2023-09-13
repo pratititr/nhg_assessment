@@ -1,5 +1,13 @@
 trigger:
-- main
+- none
+
+resources:
+  pipelines:
+  - pipeline: release
+    source: ci-build 
+    trigger: 
+      branches:
+      - main
 
 name: Deploy Static Website
 
