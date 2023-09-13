@@ -1,4 +1,3 @@
-
 trigger:
 - main
 
@@ -35,10 +34,12 @@ stages:
         Contents: '**'
         TargetFolder: '(Build.ArtifactStagingDirectory)'
         OverWrite: true
+
     - task: ArchiveFiles@2
       inputs:
        rootFolderOrFile: '$(build.sourcesDirectory)'
        includeRootFolder: false
+
     - task: PublishBuildArtifacts@1
       inputs:
         PathtoPublish: '$(Build.ArtifactStagingDirectory)'
