@@ -1,0 +1,46 @@
+
+trigger:
+- main
+
+pool:
+  vmImage: windows-latest
+
+
+stages:
+- stage: Build
+  jobs:
+  - job: Build
+    steps:
+    - script: |
+        pwd
+        echo Static Website 
+      displayName: 'Build Static Website'
+
+- stage: Test
+  dependsOn: Build
+  jobs:    
+  - job: Test
+    steps:
+    - script:
+      displayName: 'Test Application'
+
+- stage: Publish
+  dependsOn: Test
+  jobs:  
+  - job: Publish
+    steps:
+    - task: CopyFiles@2
+      inputs:
+        SourceFolder: '$(Build.SourcesDirectory)'
+        Contents: '**'
+        TargetFolder: '(Build.ArtifactStagingDirectory)'
+        OverWrite: true
+    - task: ArchiveFiles@2
+      inputs:
+       rootFolderOrFile: '$(build.sourcesDirectory)'
+       includeRootFolder: false
+    - task: PublishBuildArtifacts@1
+      inputs:
+        PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+        ArtifactName: 'drop'
+        publishLocation: 'Container'
